@@ -1,13 +1,22 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// ============================================
+// MIDDLEWARE
+// ============================================
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'https://egbujor-emmanuel.github.io',
+    process.env.FRONTEND_URL || '*'
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
 }));
@@ -17,7 +26,6 @@ app.use(express.json());
 // ASP AUTHENTICATION
 // ============================================
 
-// Simple API key authentication for ASP endpoints
 const ASP_API_KEY = process.env.ASP_API_KEY || 'vaultiq-asp-key-2026'
 
 const authenticateASP = (req, res, next) => {
@@ -42,12 +50,12 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     message: 'VaultIQ ASP is alive!',
     version: '1.0.0',
-    agentId: 'agent_mrllmb7z',
-    aspId: 'asp_mrllmb7z'
+    agentId: process.env.AGENT_ID || 'agent_mrllmb7z',
+    aspId: process.env.ASP_ID || 'asp_mrllmb7z'
   })
 })
 
-// ASP Analyze Endpoint (A2MCP)
+// ASP Analyze Endpoint
 app.post('/api/analyze', authenticateASP, async (req, res) => {
   try {
     const { address, chainId = '1952' } = req.body
@@ -73,7 +81,6 @@ app.post('/api/analyze', authenticateASP, async (req, res) => {
       })
     }
 
-    // Generate risk analysis
     const risks = []
     
     if (prices['BTC-USDT'] > 60000) {
@@ -98,7 +105,17 @@ app.post('/api/analyze', authenticateASP, async (req, res) => {
       })
     }
 
-    // Response in OKX ASP format
+    if (prices['OKB-USDT']) {
+      risks.push({
+        id: Date.now().toString() + '3',
+        type: 'opportunity',
+        severity: 'low',
+        title: `OKB at $${prices['OKB-USDT'].toFixed(2)}`,
+        impact: 'Ecosystem token',
+        action: 'monitor'
+      })
+    }
+
     res.json({
       success: true,
       data: {
@@ -118,10 +135,9 @@ app.post('/api/analyze', authenticateASP, async (req, res) => {
         timestamp: new Date().toISOString()
       },
       metadata: {
-        agentId: 'agent_mrllmb7z',
-        aspId: 'asp_mrllmb7z',
-        source: 'REAL OKX Data',
-        chainId: chainId
+        agentId: process.env.AGENT_ID || 'agent_mrllmb7z',
+        aspId: process.env.ASP_ID || 'asp_mrllmb7z',
+        source: 'REAL OKX Data'
       }
     })
 
@@ -135,7 +151,7 @@ app.post('/api/analyze', authenticateASP, async (req, res) => {
   }
 })
 
-// ASP Resolve Endpoint (A2MCP)
+// ASP Resolve Endpoint
 app.post('/api/resolve', authenticateASP, async (req, res) => {
   try {
     const { riskId, action } = req.body
@@ -150,7 +166,6 @@ app.post('/api/resolve', authenticateASP, async (req, res) => {
 
     console.log(`🔧 Resolving risk: ${riskId}`)
 
-    // Simulate resolution
     const txHash = '0x' + Array.from({length: 64}, () => 
       Math.floor(Math.random() * 16).toString(16)
     ).join('')
@@ -161,12 +176,11 @@ app.post('/api/resolve', authenticateASP, async (req, res) => {
         riskId: riskId,
         status: 'resolved',
         transactionHash: txHash,
-        resolvedAt: new Date().toISOString(),
-        action: action || 'monitor'
+        resolvedAt: new Date().toISOString()
       },
       metadata: {
-        agentId: 'agent_mrllmb7z',
-        aspId: 'asp_mrllmb7z'
+        agentId: process.env.AGENT_ID || 'agent_mrllmb7z',
+        aspId: process.env.ASP_ID || 'asp_mrllmb7z'
       }
     })
 
@@ -180,38 +194,27 @@ app.post('/api/resolve', authenticateASP, async (req, res) => {
   }
 })
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ VaultIQ ASP running on http://localhost:${PORT}`)
-  console.log(`📊 Health: http://localhost:${PORT}/api/health`)
-  console.log(`🔐 Agent ID: agent_mrllmb7z`)
-  console.log(`🔐 ASP ID: asp_mrllmb7z`)
-  console.log(`🔑 API Key: ${ASP_API_KEY}`)
-})
-
 // ============================================
-// PAYMENT ENDPOINTS (A2MCP)
+// PAYMENT ENDPOINTS
 // ============================================
 
-// Create payment request
 app.post('/api/payment/create', authenticateASP, async (req, res) => {
   try {
-    const { amount, currency, payer, metadata } = req.body
+    const { amount = '0.01', currency = 'OKB', payer, metadata } = req.body
     
-    // Import payment service dynamically
-    const { default: paymentService } = await import('./frontend/src/services/paymentService.js')
-    
-    const payment = await paymentService.createPaymentRequest({
-      amount: amount || '0.01',
-      currency: currency || 'OKB',
-      payer: payer || 'unknown',
-      metadata: metadata || {}
-    })
+    const paymentId = 'pay_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6)
     
     res.json({
       success: true,
-      data: payment,
-      timestamp: new Date().toISOString()
+      data: {
+        id: paymentId,
+        amount: amount,
+        currency: currency,
+        payer: payer || 'unknown',
+        payee: process.env.ASP_ID || 'asp_mrllmb7z',
+        status: 'pending',
+        timestamp: new Date().toISOString()
+      }
     })
     
   } catch (error) {
@@ -224,52 +227,26 @@ app.post('/api/payment/create', authenticateASP, async (req, res) => {
   }
 })
 
-// Process payment
-app.post('/api/payment/process/:paymentId', authenticateASP, async (req, res) => {
-  try {
-    const { paymentId } = req.params
-    
-    const { default: paymentService } = await import('./frontend/src/services/paymentService.js')
-    
-    const result = await paymentService.processPayment(paymentId)
-    
-    res.json({
-      success: true,
-      data: result,
-      timestamp: new Date().toISOString()
-    })
-    
-  } catch (error) {
-    console.error('❌ Payment processing error:', error)
-    res.status(500).json({
-      success: false,
-      error: 'PAYMENT_ERROR',
-      message: error.message
-    })
-  }
+// ============================================
+// SERVE STATIC FRONTEND (for Railway)
+// ============================================
+
+// Serve frontend static files from dist folder
+const distPath = path.join(__dirname, 'frontend', 'dist')
+app.use(express.static(distPath))
+
+// Catch-all route to serve index.html for SPA
+app.get('*', (req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'))
 })
 
-// Get payment status
-app.get('/api/payment/status/:paymentId', authenticateASP, async (req, res) => {
-  try {
-    const { paymentId } = req.params
-    
-    const { default: paymentService } = await import('./frontend/src/services/paymentService.js')
-    
-    const status = await paymentService.getPaymentStatus(paymentId)
-    
-    res.json({
-      success: true,
-      data: status,
-      timestamp: new Date().toISOString()
-    })
-    
-  } catch (error) {
-    console.error('❌ Payment status error:', error)
-    res.status(500).json({
-      success: false,
-      error: 'PAYMENT_ERROR',
-      message: error.message
-    })
-  }
+// ============================================
+// START SERVER
+// ============================================
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ VaultIQ ASP running on http://localhost:${PORT}`)
+  console.log(`📊 Health: http://localhost:${PORT}/api/health`)
+  console.log(`🔐 Agent ID: ${process.env.AGENT_ID || 'agent_mrllmb7z'}`)
+  console.log(`🔐 ASP ID: ${process.env.ASP_ID || 'asp_mrllmb7z'}`)
 })
