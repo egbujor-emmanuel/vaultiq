@@ -9,16 +9,14 @@ import {
   TrendingUp,
   Globe,
   Wallet,
-  PartyPopper,
-  Key,
-  Check
+  PartyPopper
 } from 'lucide-react'
 import Timeline from './Timeline'
 import Guardian from '../services/guardian'
 import aiService from '../services/aiService'
 import executionService from '../services/executionService'
 import realWalletService from '../services/realWalletService'
-import registrationService from '../services/registrationService'
+import paymentService from '../services/paymentService'
 
 function Dashboard() {
   const [walletAddress, setWalletAddress] = useState(null)
@@ -33,6 +31,7 @@ function Dashboard() {
   const [isAiEnabled, setIsAiEnabled] = useState(false)
   const [isAiLoading, setIsAiLoading] = useState(false)
   const [isResolving, setIsResolving] = useState(false)
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
   const [executionResults, setExecutionResults] = useState({})
   const [isInitialized, setIsInitialized] = useState(false)
   const [language, setLanguage] = useState('en')
@@ -40,14 +39,6 @@ function Dashboard() {
   const [allResolved, setAllResolved] = useState(false)
   const [resolvedRisks, setResolvedRisks] = useState(new Set())
 
-  // Registration States
-  const [isRegistering, setIsRegistering] = useState(false)
-  const [registrationComplete, setRegistrationComplete] = useState(false)
-  const [agentId, setAgentId] = useState(null)
-  const [aspId, setAspId] = useState(null)
-  const [listingId, setListingId] = useState(null)
-
-  // Translations
   const translations = {
     en: {
       title: 'VaultIQ',
@@ -88,11 +79,9 @@ function Dashboard() {
       impactReduction: 'Impact Reduction',
       network: 'Network',
       willResolve: 'Will resolve:',
-      registerAsp: 'Register ASP',
-      registering: 'Registering...',
-      registered: 'Registered',
-      agentId: 'Agent ID',
-      aspId: 'ASP ID'
+      processingPayment: 'Processing payment...',
+      paymentFailed: 'Payment failed. Please try again.',
+      paymentSuccess: 'Payment confirmed!'
     },
     zh: {
       title: 'VaultIQ',
@@ -133,11 +122,9 @@ function Dashboard() {
       impactReduction: '影响降低',
       network: '网络',
       willResolve: '将解决：',
-      registerAsp: '注册 ASP',
-      registering: '注册中...',
-      registered: '已注册',
-      agentId: 'Agent ID',
-      aspId: 'ASP ID'
+      processingPayment: '处理支付中...',
+      paymentFailed: '支付失败。请重试。',
+      paymentSuccess: '支付已确认！'
     }
   }
 
@@ -150,6 +137,8 @@ function Dashboard() {
       setGuardian(guardianInstance)
       setIsInitialized(true)
       executionService.setWalletAddress(walletAddress)
+      // Initialize Payment Service
+      paymentService.initialize('agent_mrllmb7z', 'asp_mrllmb7z')
     } else {
       setGuardian(null)
       setScanResult(null)
@@ -173,17 +162,6 @@ function Dashboard() {
     }
   }, [scanResult, resolvedRisks])
 
-  // Check registration status on load
-  useEffect(() => {
-    const ids = registrationService.loadIds()
-    if (ids.isRegistered) {
-      setRegistrationComplete(true)
-      setAgentId(ids.agentId)
-      setAspId(ids.aspId)
-      setListingId(ids.listingId)
-    }
-  }, [])
-
   // Listen for wallet connection events
   useEffect(() => {
     const handleWalletConnected = (event) => {
@@ -193,6 +171,7 @@ function Dashboard() {
       if (event.detail.network) setWalletNetwork(event.detail.network)
       setIsRealWallet(true)
       executionService.setWalletAddress(event.detail.address)
+      paymentService.initialize('agent_mrllmb7z', 'asp_mrllmb7z')
     }
 
     const handleWalletDisconnected = () => {
@@ -225,39 +204,13 @@ function Dashboard() {
       setIsRealWallet(true)
       setIsInitialized(true)
       executionService.setWalletAddress(result.address)
+      paymentService.initialize('agent_mrllmb7z', 'asp_mrllmb7z')
       console.log('✅ Real wallet connected:', result)
     } catch (error) {
       console.error('❌ Real wallet connection failed:', error)
       alert('Failed to connect real wallet. Please make sure OKX Wallet is installed and unlocked.')
     } finally {
       setIsConnectingReal(false)
-    }
-  }
-
-  const handleRegister = async () => {
-    const apiKey = prompt('Enter your OKX API Key:')
-    if (!apiKey) return
-    
-    const secretKey = prompt('Enter your OKX Secret Key:')
-    if (!secretKey) return
-    
-    const passphrase = prompt('Enter your OKX Passphrase:')
-    if (!passphrase) return
-    
-    setIsRegistering(true)
-    try {
-      registrationService.initialize(apiKey, secretKey, passphrase)
-      const result = await registrationService.registerVaultIQ()
-      setRegistrationComplete(true)
-      setAgentId(result.agentId)
-      setAspId(result.aspId)
-      setListingId(result.listingId)
-      alert(`✅ VaultIQ registered!\nAgent ID: ${result.agentId}\nASP ID: ${result.aspId}\nListing ID: ${result.listingId}`)
-    } catch (error) {
-      console.error('Registration failed:', error)
-      alert('❌ Registration failed. Please check your API credentials.')
-    } finally {
-      setIsRegistering(false)
     }
   }
 
@@ -322,8 +275,36 @@ function Dashboard() {
     }
 
     if (isResolving) return
+    if (isProcessingPayment) return
     if (resolvedRisks.has(risk.id)) return
 
+    // Step 1: Process Payment
+    setIsProcessingPayment(true)
+    let paymentResult = null
+    
+    try {
+      const payment = await paymentService.createPaymentRequest({
+        amount: '0.01',
+        currency: 'OKB',
+        payer: walletAddress,
+        metadata: { riskId: risk.id, riskTitle: risk.title }
+      })
+      
+      console.log('💳 Payment created:', payment.id)
+      
+      paymentResult = await paymentService.processPayment(payment.id)
+      console.log('✅ Payment processed:', paymentResult)
+      
+    } catch (paymentError) {
+      console.error('❌ Payment failed:', paymentError)
+      setIsProcessingPayment(false)
+      alert(t.paymentFailed)
+      return
+    }
+    
+    setIsProcessingPayment(false)
+
+    // Step 2: Execute Resolution
     setIsResolving(true)
 
     try {
@@ -338,12 +319,12 @@ function Dashboard() {
       }
 
       console.log(`🔄 Executing resolve for risk: ${risk.id}`)
-      console.log(`📝 Will resolve: ${risk.title}`)
       
       const result = await executionService.executeAction(action, risk.id)
       
       console.log(`✅ Resolve result for risk ${risk.id}:`, result)
       
+      // Mark as resolved
       setResolvedRisks(prev => {
         const newSet = new Set(prev)
         newSet.add(risk.id)
@@ -356,7 +337,8 @@ function Dashboard() {
           success: true,
           successMessage: `${t.resolvingSuccess}: ${risk.title}`,
           resolvedAt: new Date().toISOString(),
-          transactionHash: result.transactionHash || null
+          transactionHash: result.transactionHash || null,
+          paymentId: paymentResult?.paymentId || null
         }
       }))
 
@@ -390,6 +372,29 @@ function Dashboard() {
       return
     }
 
+    // Process payment for all unresolved risks
+    setIsProcessingPayment(true)
+    try {
+      const payment = await paymentService.createPaymentRequest({
+        amount: (0.01 * unresolvedRisks.length).toString(),
+        currency: 'OKB',
+        payer: walletAddress,
+        metadata: { 
+          riskCount: unresolvedRisks.length,
+          riskIds: unresolvedRisks.map(r => r.id)
+        }
+      })
+      
+      await paymentService.processPayment(payment.id)
+    } catch (paymentError) {
+      console.error('❌ Payment failed:', paymentError)
+      setIsProcessingPayment(false)
+      alert(t.paymentFailed)
+      return
+    }
+    setIsProcessingPayment(false)
+
+    // Execute all resolutions
     setIsResolving(true)
     
     try {
@@ -405,6 +410,7 @@ function Dashboard() {
 
       const result = await executionService.executeBatch(actions)
       
+      // Mark all as resolved
       setResolvedRisks(prev => {
         const newSet = new Set(prev)
         unresolvedRisks.forEach(risk => newSet.add(risk.id))
@@ -510,53 +516,6 @@ function Dashboard() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {/* Registration Button */}
-          {!registrationComplete ? (
-            <button
-              onClick={handleRegister}
-              disabled={isRegistering}
-              style={{
-                padding: '6px 14px',
-                background: isRegistering ? '#e9ecef' : '#0052ff',
-                color: isRegistering ? '#6c757d' : 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '13px',
-                fontWeight: 500,
-                cursor: isRegistering ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-            >
-              {isRegistering ? (
-                <>
-                  <span className="spinner" style={{ width: '12px', height: '12px' }} />
-                  {t.registering}
-                </>
-              ) : (
-                <>
-                  <Key size={14} />
-                  {t.registerAsp}
-                </>
-              )}
-            </button>
-          ) : (
-            <span style={{
-              padding: '6px 14px',
-              background: '#d4edda',
-              borderRadius: '8px',
-              fontSize: '13px',
-              color: '#155724',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
-              <Check size={14} />
-              {t.registered}
-            </span>
-          )}
-
           <button
             onClick={toggleLanguage}
             style={{
@@ -630,29 +589,6 @@ function Dashboard() {
           )}
         </div>
       </header>
-
-      {/* Registration Status */}
-      {registrationComplete && (
-        <div style={{
-          background: '#d4edda',
-          padding: '8px 16px',
-          borderRadius: '8px',
-          marginBottom: '16px',
-          border: '1px solid #c3e6cb',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          flexWrap: 'wrap',
-          fontSize: '13px',
-          color: '#155724'
-        }}>
-          <Check size={16} />
-          <span>✅ ASP Registered</span>
-          {agentId && <span>| Agent: {agentId.slice(0, 12)}...</span>}
-          {aspId && <span>| ASP: {aspId.slice(0, 12)}...</span>}
-          {listingId && <span>| Listing: {listingId.slice(0, 12)}...</span>}
-        </div>
-      )}
 
       {walletAddress && (
         <div style={{
@@ -915,22 +851,22 @@ function Dashboard() {
             </h3>
             <button
               onClick={handleFixAll}
-              disabled={isResolving || !isInitialized}
+              disabled={isResolving || isProcessingPayment || !isInitialized}
               style={{
                 padding: '8px 16px',
-                background: isResolving ? '#e9ecef' : 'transparent',
+                background: (isResolving || isProcessingPayment) ? '#e9ecef' : 'transparent',
                 border: '1px solid #dee2e6',
                 borderRadius: '8px',
                 fontSize: '14px',
-                color: isResolving ? '#6c757d' : '#0052ff',
-                cursor: (isResolving || !isInitialized) ? 'not-allowed' : 'pointer',
+                color: (isResolving || isProcessingPayment) ? '#6c757d' : '#0052ff',
+                cursor: (isResolving || isProcessingPayment || !isInitialized) ? 'not-allowed' : 'pointer',
                 fontWeight: 500
               }}
             >
-              {isResolving ? (
+              {isResolving || isProcessingPayment ? (
                 <>
                   <span className="spinner" />
-                  Executing...
+                  {isProcessingPayment ? t.processingPayment : 'Executing...'}
                 </>
               ) : (
                 `${t.fixAll} →`
@@ -1025,6 +961,7 @@ function Dashboard() {
                     </span>
                   </div>
 
+                  {/* Show what VaultIQ will do */}
                   <div style={{
                     margin: '8px 0',
                     padding: '8px 12px',
@@ -1097,14 +1034,14 @@ function Dashboard() {
                     </span>
                     <button
                       onClick={() => handleExecute(risk)}
-                      disabled={isResolving || !isInitialized}
+                      disabled={isResolving || isProcessingPayment || !isInitialized}
                       style={{
                         padding: '8px 20px',
-                        background: isResolving ? '#e9ecef' : '#0052ff',
-                        color: isResolving ? '#6c757d' : 'white',
+                        background: (isResolving || isProcessingPayment) ? '#e9ecef' : '#0052ff',
+                        color: (isResolving || isProcessingPayment) ? '#6c757d' : 'white',
                         border: 'none',
                         borderRadius: '20px',
-                        cursor: (isResolving || !isInitialized) ? 'not-allowed' : 'pointer',
+                        cursor: (isResolving || isProcessingPayment || !isInitialized) ? 'not-allowed' : 'pointer',
                         fontSize: '14px',
                         fontWeight: 500,
                         display: 'flex',
@@ -1113,16 +1050,25 @@ function Dashboard() {
                         transition: 'all 0.2s ease'
                       }}
                       onMouseEnter={(e) => {
-                        if (!isResolving && isInitialized) e.target.style.background = '#0037cc'
+                        if (!isResolving && !isProcessingPayment && isInitialized) {
+                          e.target.style.background = '#0037cc'
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        if (!isResolving && isInitialized) e.target.style.background = '#0052ff'
+                        if (!isResolving && !isProcessingPayment && isInitialized) {
+                          e.target.style.background = '#0052ff'
+                        }
                       }}
                     >
                       {isResolving ? (
                         <>
                           <span className="spinner" />
                           {t.resolving}
+                        </>
+                      ) : isProcessingPayment ? (
+                        <>
+                          <span className="spinner" />
+                          {t.processingPayment}
                         </>
                       ) : (
                         <>
@@ -1146,6 +1092,11 @@ function Dashboard() {
                           {result.transactionHash && (
                             <span style={{ fontSize: '11px', display: 'block', marginTop: '2px', color: '#6c757d' }}>
                               TX: {result.transactionHash.slice(0, 20)}...
+                            </span>
+                          )}
+                          {result.paymentId && (
+                            <span style={{ fontSize: '11px', display: 'block', marginTop: '2px', color: '#6c757d' }}>
+                              💳 Payment: {result.paymentId}
                             </span>
                           )}
                         </span>

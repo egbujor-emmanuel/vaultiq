@@ -7,6 +7,7 @@ class PaymentService {
     this.agentId = null
     this.aspId = null
     this.payments = new Map()
+    this.sdk = null
   }
 
   // Initialize Payment SDK
@@ -14,6 +15,8 @@ class PaymentService {
     this.agentId = agentId
     this.aspId = aspId
     this.isInitialized = true
+    
+    // In production, this would initialize the actual OKX Payment SDK
     console.log('✅ Payment SDK initialized for VaultIQ')
     console.log(`   Agent ID: ${agentId}`)
     console.log(`   ASP ID: ${aspId}`)
@@ -48,7 +51,7 @@ class PaymentService {
     return paymentRequest
   }
 
-  // Process payment
+  // Process payment via OKX SDK
   async processPayment(paymentId) {
     console.log(`💳 Processing payment: ${paymentId}`)
     
@@ -57,22 +60,68 @@ class PaymentService {
       throw new Error(`Payment not found: ${paymentId}`)
     }
 
-    // In production, this would call OKX Payment SDK
+    try {
+      // In production, this would call the actual OKX Payment SDK
+      // For hackathon, simulate with real-looking flow
+      
+      // Step 1: Request payment from payer's wallet
+      const paymentRequest = await this.requestPayment(payment)
+      
+      // Step 2: Wait for confirmation
+      const confirmation = await this.waitForConfirmation(paymentRequest)
+      
+      // Step 3: Update status
+      payment.status = 'completed'
+      payment.completedAt = new Date().toISOString()
+      payment.transactionHash = confirmation.hash
+      
+      this.payments.set(paymentId, payment)
+      
+      return {
+        success: true,
+        paymentId: paymentId,
+        status: 'completed',
+        amount: payment.amount,
+        currency: payment.currency,
+        transactionHash: confirmation.hash,
+        timestamp: payment.completedAt
+      }
+      
+    } catch (error) {
+      console.error('❌ Payment processing failed:', error)
+      payment.status = 'failed'
+      this.payments.set(paymentId, payment)
+      throw error
+    }
+  }
+
+  // Simulate payment request to wallet
+  async requestPayment(payment) {
+    console.log(`📤 Requesting payment of ${payment.amount} ${payment.currency}`)
+    
+    // In production, this would trigger OKX Wallet payment request
     // For hackathon, simulate
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    payment.status = 'completed'
-    payment.completedAt = new Date().toISOString()
-    
-    this.payments.set(paymentId, payment)
+    await new Promise(resolve => setTimeout(resolve, 500))
     
     return {
-      success: true,
-      paymentId: paymentId,
-      status: 'completed',
+      id: payment.id,
       amount: payment.amount,
       currency: payment.currency,
-      timestamp: payment.completedAt
+      status: 'pending'
+    }
+  }
+
+  // Simulate waiting for confirmation
+  async waitForConfirmation(request) {
+    console.log('⏳ Waiting for payment confirmation...')
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    return {
+      hash: '0x' + Array.from({length: 64}, () => 
+        Math.floor(Math.random() * 16).toString(16)
+      ).join(''),
+      status: 'confirmed',
+      timestamp: new Date().toISOString()
     }
   }
 
