@@ -1,0 +1,76 @@
+{
+  "name": "VaultIQ",
+  "version": "1.0.0",
+  "type": "A2MCP",
+  "agentId": "agent_mrllmb7z",
+  "aspId": "asp_mrllmb7z",
+  "listingId": "listing_mrllmb7z",
+  "description": "AI trust layer for autonomous finance. Analyzes wallet risks, provides AI explanations, and executes secure transactions on X Layer.",
+  "endpoints": {
+    "analyze": {
+      "method": "POST",
+      "path": "/api/analyze",
+      "description": "Analyze a wallet for security risks",
+      "parameters": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Wallet address to analyze"
+        },
+        "chainId": {
+          "type": "string",
+          "required": false,
+          "description": "Chain ID (default: 1952 for X Layer Testnet)",
+          "default": "1952"
+        }
+      },
+      "response": {
+        "risks": "array",
+        "summary": "object",
+        "marketData": "object",
+        "timestamp": "string",
+        "isRealData": "boolean"
+      }
+    },
+    "resolve": {
+      "method": "POST",
+      "path": "/api/resolve",
+      "description": "Resolve a specific wallet risk",
+      "parameters": {
+        "riskId": {
+          "type": "string",
+          "required": true,
+          "description": "Risk ID to resolve"
+        },
+        "action": {
+          "type": "object",
+          "required": true,
+          "description": "Action to execute"
+        }
+      },
+      "response": {
+        "success": "boolean",
+        "transactionHash": "string",
+        "message": "string"
+      }
+    }
+  },
+  "pricing": {
+    "model": "pay-per-request",
+    "price": "0.01",
+    "currency": "OKB",
+    "description": "Pay 0.01 OKB per wallet analysis request"
+  },
+  "capabilities": [
+    "wallet-analysis",
+    "risk-detection",
+    "ai-explanations",
+    "transaction-execution",
+    "real-time-market-data"
+  ],
+  "security": {
+    "authentication": "API Key",
+    "encryption": "TLS 1.2+",
+    "rateLimiting": "100 requests per minute"
+  }
+}
