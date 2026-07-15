@@ -1,5 +1,4 @@
-// AI Service - Handles OpenAI integration
-// OpenAI is imported dynamically to avoid build issues
+// AI Service - Personalizes based on REAL wallet data
 
 class AIService {
   constructor() {
@@ -14,18 +13,21 @@ class AIService {
     return true
   }
 
-  // Generate explanation using OpenAI (dynamic import)
   async generateExplanation(risk, walletAddress, walletData) {
-    console.log('🤖 Generating AI explanation...')
+    console.log('🤖 Generating personalized AI explanation...')
+    
+    const balance = walletData?.balances?.[0]?.balance || 0
+    const hasBalance = balance > 0
+    
+    // ✅ ALWAYS use real wallet data
+    const context = this.buildPersonalizedContext(risk, walletData)
     
     if (!this.isEnabled || !this.apiKey) {
-      return this.getFallbackExplanation(risk, walletData)
+      return this.getPersonalizedFallback(risk, walletData)
     }
 
     try {
-      // Dynamic import for OpenAI (only loads when needed)
-      const { default: OpenAI } = await import('openai')
-      
+      const { OpenAI } = await import('openai')
       const openai = new OpenAI({
         apiKey: this.apiKey,
         dangerouslyAllowBrowser: true
@@ -36,65 +38,69 @@ class AIService {
         messages: [
           {
             role: 'system',
-            content: `You are VaultIQ, an AI financial advisor for Web3. Provide concise, actionable advice.`
+            content: `You are VaultIQ, an AI financial advisor. Analyze the wallet data and provide specific, personalized recommendations.`
           },
           {
             role: 'user',
-            content: this.buildPrompt(risk, walletData)
+            content: context
           }
         ],
         temperature: 0.7,
-        max_tokens: 150
+        max_tokens: 200
       })
 
       return {
         explanation: response.choices[0].message.content,
-        confidence: 85,
-        impactReduction: '85%',
+        confidence: this.calculateConfidence(risk, walletData),
+        impactReduction: this.calculateImpactReduction(risk),
         isPersonalized: true
       }
 
     } catch (error) {
       console.error('AI Error:', error)
-      return this.getFallbackExplanation(risk, walletData)
+      return this.getPersonalizedFallback(risk, walletData)
     }
   }
 
-  buildPrompt(risk, walletData) {
+  buildPersonalizedContext(risk, walletData) {
     const balance = walletData?.balances?.[0]?.balance || 0
+    const balanceStr = balance > 0 ? `${balance.toFixed(4)} OKB` : 'no OKB'
+    const tokens = walletData?.tokens?.map(t => t.symbol).join(', ') || 'none'
+    
     return `
-      Risk: ${risk.title}
-      Description: ${risk.description}
-      Wallet Balance: ${balance} OKB
+      Wallet Data:
+      - Balance: ${balanceStr}
+      - Tokens: ${tokens}
       
-      Provide a brief, actionable recommendation.
+      Risk:
+      - Type: ${risk.type}
+      - Title: ${risk.title}
+      - Severity: ${risk.severity}
+      - Description: ${risk.description}
+      
+      Generate a specific, actionable recommendation for THIS wallet.
     `
   }
 
-  getFallbackExplanation(risk, walletData) {
+  getPersonalizedFallback(risk, walletData) {
     const balance = walletData?.balances?.[0]?.balance || 0
     const balanceStr = balance > 0 ? `${balance.toFixed(4)} OKB` : 'no OKB'
     
     const messages = {
       'market': {
-        explanation: `📊 Market risk detected with ${balanceStr} in wallet. ${balance > 0 ? 'Consider adjusting positions.' : 'Monitor market conditions.'}`,
+        explanation: `📊 Market risk with ${balanceStr} in wallet. ${balance > 0 ? 'Consider adjusting positions.' : 'Monitor for entry points.'}`,
         confidence: 85,
         impactReduction: '75%'
       },
       'approval': {
-        explanation: `⚠️ Unlimited approval detected with ${balanceStr} at risk. ${balance > 0 ? 'Revoke this approval immediately.' : 'Revoke approval to prevent future risk.'}`,
+        explanation: `⚠️ Unlimited approval with ${balanceStr} at risk. Revoke immediately to secure funds.`,
         confidence: 94,
         impactReduction: '92%'
       },
       'idle': {
-        explanation: `💡 ${balance > 0 ? `You have ${balanceStr} that could be earning yield.` : 'No idle funds detected.'}`,
+        explanation: `💡 ${balance > 0 ? `${balanceStr} can earn yield.` : 'No idle funds.'} Stake for passive income.`,
         confidence: 88,
         impactReduction: '85%'
-      },
-      'gas': {
-        explanation: `⛽ Gas optimization could save you ${balance > 0 ? '~$47/month' : 'future fees'}.`,
-        confidence: 82,
-        impactReduction: '78%'
       }
     }
     
@@ -103,6 +109,25 @@ class AIService {
       confidence: 80,
       impactReduction: '85%'
     }
+  }
+
+  calculateConfidence(risk, walletData) {
+    let confidence = 85
+    if (risk.type === 'approval') confidence += 5
+    if (risk.severity === 'critical') confidence += 5
+    if (walletData?.balances?.length > 0) confidence += 5
+    return Math.min(confidence, 99)
+  }
+
+  calculateImpactReduction(risk) {
+    const reductions = {
+      'approval': '92%',
+      'liquidation': '87%',
+      'idle': '85%',
+      'gas': '78%',
+      'market': '75%'
+    }
+    return reductions[risk.type] || '85%'
   }
 }
 

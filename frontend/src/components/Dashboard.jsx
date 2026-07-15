@@ -137,7 +137,6 @@ function Dashboard() {
       setGuardian(guardianInstance)
       setIsInitialized(true)
       executionService.setWalletAddress(walletAddress)
-      // Initialize Payment Service
       paymentService.initialize('agent_mrllmb7z', 'asp_mrllmb7z')
     } else {
       setGuardian(null)
@@ -324,7 +323,6 @@ function Dashboard() {
       
       console.log(`✅ Resolve result for risk ${risk.id}:`, result)
       
-      // Mark as resolved
       setResolvedRisks(prev => {
         const newSet = new Set(prev)
         newSet.add(risk.id)
@@ -374,6 +372,7 @@ function Dashboard() {
 
     // Process payment for all unresolved risks
     setIsProcessingPayment(true)
+    let paymentResult = null
     try {
       const payment = await paymentService.createPaymentRequest({
         amount: (0.01 * unresolvedRisks.length).toString(),
@@ -385,7 +384,7 @@ function Dashboard() {
         }
       })
       
-      await paymentService.processPayment(payment.id)
+      paymentResult = await paymentService.processPayment(payment.id)
     } catch (paymentError) {
       console.error('❌ Payment failed:', paymentError)
       setIsProcessingPayment(false)
@@ -410,7 +409,6 @@ function Dashboard() {
 
       const result = await executionService.executeBatch(actions)
       
-      // Mark all as resolved
       setResolvedRisks(prev => {
         const newSet = new Set(prev)
         unresolvedRisks.forEach(risk => newSet.add(risk.id))
@@ -422,7 +420,8 @@ function Dashboard() {
         const risk = scanResult.risks.find(risk => risk.id === r.riskId)
         results[r.riskId] = {
           success: true,
-          successMessage: `${t.resolvingSuccess}: ${risk?.title || 'risk'}`
+          successMessage: `${t.resolvingSuccess}: ${risk?.title || 'risk'}`,
+          paymentId: paymentResult?.paymentId || null
         }
       })
       setExecutionResults(prev => ({ ...prev, ...results }))
@@ -961,7 +960,6 @@ function Dashboard() {
                     </span>
                   </div>
 
-                  {/* Show what VaultIQ will do */}
                   <div style={{
                     margin: '8px 0',
                     padding: '8px 12px',
