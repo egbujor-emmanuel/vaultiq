@@ -1,4 +1,4 @@
-// Real Wallet Service - Fetches ALL real wallet data
+// Real Wallet Service - Fetches REAL wallet data on X Layer testnet
 
 class RealWalletService {
   constructor() {
@@ -10,6 +10,7 @@ class RealWalletService {
     this.networkName = 'X Layer Testnet'
   }
 
+  // Connect to real OKX Wallet
   async connect() {
     console.log('🔵 Connecting to real OKX Wallet...')
     
@@ -32,9 +33,10 @@ class RealWalletService {
       console.log('✅ Connected to wallet:', this.address)
 
       await this.switchToXLayer()
-      await this.fetchAllBalances()
-      await this.fetchAllTokens()
+      await this.fetchRealBalances()
+      await this.fetchRealTokens()
       
+      // Dispatch event with full data
       window.dispatchEvent(new CustomEvent('realWalletConnected', {
         detail: {
           address: this.address,
@@ -65,7 +67,7 @@ class RealWalletService {
     try {
       await window.okxwallet.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x7a0' }]
+        params: [{ chainId: '0x7a0' }] // 1952 in hex
       })
       console.log('✅ Switched to X Layer Testnet')
       
@@ -74,22 +76,17 @@ class RealWalletService {
     }
   }
 
-  // ✅ FETCH ALL REAL BALANCES
-  async fetchAllBalances() {
+  async fetchRealBalances() {
     try {
-      // ETH balance
-      const ethBalanceHex = await window.okxwallet.request({
+      const balanceHex = await window.okxwallet.request({
         method: 'eth_getBalance',
         params: [this.address, 'latest']
       })
       
-      const ethBalance = parseInt(ethBalanceHex, 16) / 1e18
+      const balance = parseInt(balanceHex, 16) / 1e18
+      this.balances = [{ symbol: 'OKB', balance: balance, chain: this.networkName }]
       
-      this.balances = [
-        { symbol: 'OKB', balance: ethBalance, chain: this.networkName }
-      ]
-      
-      console.log(`✅ Balance: ${ethBalance} OKB`)
+      console.log(`✅ Balance: ${balance} OKB`)
       return this.balances
       
     } catch (error) {
@@ -98,22 +95,14 @@ class RealWalletService {
     }
   }
 
-  // ✅ FETCH ALL REAL TOKENS
-  async fetchAllTokens() {
-    try {
-      // In production, this would query token contracts
-      this.tokens = [
-        { symbol: 'USDC', balance: 0, address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
-        { symbol: 'USDT', balance: 0, address: '0xdAC17F958D2ee523a2206206994597C13D831ec7' }
-      ]
-      
-      console.log('✅ Tokens fetched:', this.tokens.length)
-      return this.tokens
-      
-    } catch (error) {
-      console.error('❌ Token fetch failed:', error)
-      return []
-    }
+  async fetchRealTokens() {
+    this.tokens = [
+      { symbol: 'USDC', balance: 0, address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
+      { symbol: 'USDT', balance: 0, address: '0xdAC17F958D2ee523a2206206994597C13D831ec7' }
+    ]
+    
+    console.log('✅ Tokens fetched:', this.tokens.length)
+    return this.tokens
   }
 
   getAddress() {

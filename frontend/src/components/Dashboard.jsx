@@ -134,6 +134,7 @@ function Dashboard() {
 
   const t = translations[language] || translations.en
 
+  // Initialize Guardian when wallet connects
   useEffect(() => {
     if (walletAddress) {
       const guardianInstance = new Guardian({ address: walletAddress })
@@ -163,15 +164,21 @@ function Dashboard() {
     }
   }, [scanResult, resolvedRisks])
 
+  // Wallet connection event listener - FIXED
   useEffect(() => {
     const handleWalletConnected = (event) => {
-      setWalletAddress(event.detail.address)
-      if (event.detail.chainId) setWalletChainId(event.detail.chainId)
-      if (event.detail.balances) setWalletBalances(event.detail.balances)
-      if (event.detail.network) setWalletNetwork(event.detail.network)
-      setIsRealWallet(true)
-      executionService.setWalletAddress(event.detail.address)
-      paymentService.initialize(AGENT_ID, ASP_ID)
+      console.log('📡 Wallet connected event received:', event.detail)
+      const { address, chainId, balances, network } = event.detail || {}
+      if (address) {
+        setWalletAddress(address)
+        if (chainId) setWalletChainId(chainId)
+        if (balances) setWalletBalances(balances)
+        if (network) setWalletNetwork(network)
+        setIsRealWallet(true)
+        setIsInitialized(true)
+        executionService.setWalletAddress(address)
+        paymentService.initialize(AGENT_ID, ASP_ID)
+      }
     }
 
     const handleWalletDisconnected = () => {
@@ -193,19 +200,26 @@ function Dashboard() {
     }
   }, [])
 
+  // Connect to real OKX Wallet - FIXED
   const connectRealWallet = async () => {
     setIsConnectingReal(true)
     try {
       const result = await realWalletService.connect()
-      setWalletAddress(result.address)
-      setWalletChainId(result.chainId)
-      setWalletBalances(result.balances)
-      setWalletNetwork(result.network || 'X Layer Testnet')
-      setIsRealWallet(true)
-      setIsInitialized(true)
-      executionService.setWalletAddress(result.address)
-      paymentService.initialize(AGENT_ID, ASP_ID)
-      console.log('✅ Real wallet connected:', result)
+      console.log('✅ Wallet connection result:', result)
+      
+      if (result && result.address) {
+        setWalletAddress(result.address)
+        setWalletChainId(result.chainId || '1952')
+        setWalletBalances(result.balances || [])
+        setWalletNetwork(result.network || 'X Layer Testnet')
+        setIsRealWallet(true)
+        setIsInitialized(true)
+        executionService.setWalletAddress(result.address)
+        paymentService.initialize(AGENT_ID, ASP_ID)
+        console.log('✅ Wallet connected and state updated:', result.address)
+      } else {
+        console.error('❌ No address in connection result:', result)
+      }
     } catch (error) {
       console.error('❌ Real wallet connection failed:', error)
       alert('Failed to connect real wallet. Please make sure OKX Wallet is installed and unlocked.')
