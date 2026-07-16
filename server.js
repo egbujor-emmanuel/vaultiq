@@ -5,28 +5,25 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// REAL AGENT ID: 6080
+const AGENT_ID = '6080'
+const ASP_ID = 'YOUR_ASP_ID_HERE'
+
 app.use(cors());
 app.use(express.json());
 
-// ============================================
-// HEALTH CHECK
-// ============================================
-
+// Health check
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     message: 'VaultIQ ASP is alive!',
     version: '1.0.0',
-    agentId: process.env.AGENT_ID || 'agent_mrllmb7z',
-    aspId: process.env.ASP_ID || 'asp_mrllmb7z'
+    agentId: AGENT_ID,
+    aspId: ASP_ID
   });
 });
 
-// ============================================
-// ANALYZE ENDPOINT
-// ============================================
-
+// Analyze endpoint
 app.post('/api/analyze', async (req, res) => {
   try {
     const { address } = req.body;
@@ -41,7 +38,6 @@ app.post('/api/analyze', async (req, res) => {
 
     console.log(`📊 Analyzing wallet: ${address}`);
 
-    // Fetch real market data from OKX
     const priceResponse = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SPOT');
     const priceData = await priceResponse.json();
     
@@ -85,6 +81,10 @@ app.post('/api/analyze', async (req, res) => {
           eth: prices['ETH-USDT'] || 0
         },
         timestamp: new Date().toISOString()
+      },
+      metadata: {
+        agentId: AGENT_ID,
+        aspId: ASP_ID
       }
     });
 
@@ -98,10 +98,7 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-// ============================================
-// RESOLVE ENDPOINT
-// ============================================
-
+// Resolve endpoint
 app.post('/api/resolve', async (req, res) => {
   try {
     const { riskId } = req.body;
@@ -127,6 +124,10 @@ app.post('/api/resolve', async (req, res) => {
         status: 'resolved',
         transactionHash: txHash,
         resolvedAt: new Date().toISOString()
+      },
+      metadata: {
+        agentId: AGENT_ID,
+        aspId: ASP_ID
       }
     });
 
@@ -140,13 +141,9 @@ app.post('/api/resolve', async (req, res) => {
   }
 });
 
-// ============================================
-// START SERVER
-// ============================================
-
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ VaultIQ ASP running on http://localhost:${PORT}`);
   console.log(`📊 Health: http://localhost:${PORT}/api/health`);
-  console.log(`🔐 Agent ID: ${process.env.AGENT_ID || 'agent_mrllmb7z'}`);
-  console.log(`🔐 ASP ID: ${process.env.ASP_ID || 'asp_mrllmb7z'}`);
+  console.log(`🔐 Agent ID: ${AGENT_ID}`);
+  console.log(`🔐 ASP ID: ${ASP_ID}`);
 });

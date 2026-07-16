@@ -2,9 +2,9 @@
   "name": "VaultIQ",
   "version": "1.0.0",
   "type": "A2MCP",
-  "agentId": "agent_mrllmb7z",
-  "aspId": "asp_mrllmb7z",
-  "listingId": "listing_mrllmb7z",
+  "agentId": "6080",
+  "aspId": "YOUR_ASP_ID_HERE",
+  "listingId": "YOUR_LISTING_ID_HERE",
   "description": "AI trust layer for autonomous finance. Analyzes wallet risks, provides AI explanations, and executes secure transactions on X Layer.",
   "endpoints": {
     "analyze": {

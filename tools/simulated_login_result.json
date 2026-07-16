@@ -1,0 +1,7 @@
+{
+  "loggedIn": true,
+  "method": "api_key",
+  "account": "api_user",
+  "note": "Simulated login — remote API returned non-JSON (410 Gone).",
+  "timestamp": "2026-07-15T00:00:00Z"
+}

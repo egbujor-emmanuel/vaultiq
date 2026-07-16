@@ -1,0 +1,12 @@
+{
+  "skills": {
+    "enabled": true,
+    "allowed_skills": ["okx-agent-identity", "okx-agentic-wallet", "okx-agent-payments-protocol"],
+    "auto_approve": false
+  },
+  "permissions": {
+    "run_skills": true,
+    "network_access": true,
+    "file_access": true
+  }
+}s

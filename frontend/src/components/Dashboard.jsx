@@ -18,6 +18,10 @@ import executionService from '../services/executionService'
 import realWalletService from '../services/realWalletService'
 import paymentService from '../services/paymentService'
 
+// REAL AGENT ID: 6080
+const AGENT_ID = '6080'
+const ASP_ID = 'YOUR_ASP_ID_HERE'
+
 function Dashboard() {
   const [walletAddress, setWalletAddress] = useState(null)
   const [walletBalances, setWalletBalances] = useState([])
@@ -130,14 +134,13 @@ function Dashboard() {
 
   const t = translations[language] || translations.en
 
-  // Initialize Guardian when wallet connects
   useEffect(() => {
     if (walletAddress) {
       const guardianInstance = new Guardian({ address: walletAddress })
       setGuardian(guardianInstance)
       setIsInitialized(true)
       executionService.setWalletAddress(walletAddress)
-      paymentService.initialize('agent_mrllmb7z', 'asp_mrllmb7z')
+      paymentService.initialize(AGENT_ID, ASP_ID)
     } else {
       setGuardian(null)
       setScanResult(null)
@@ -149,7 +152,6 @@ function Dashboard() {
     }
   }, [walletAddress])
 
-  // Check if all risks are resolved
   useEffect(() => {
     if (scanResult && scanResult.risks && scanResult.risks.length > 0) {
       const resolvedCount = resolvedRisks.size
@@ -161,7 +163,6 @@ function Dashboard() {
     }
   }, [scanResult, resolvedRisks])
 
-  // Listen for wallet connection events
   useEffect(() => {
     const handleWalletConnected = (event) => {
       setWalletAddress(event.detail.address)
@@ -170,7 +171,7 @@ function Dashboard() {
       if (event.detail.network) setWalletNetwork(event.detail.network)
       setIsRealWallet(true)
       executionService.setWalletAddress(event.detail.address)
-      paymentService.initialize('agent_mrllmb7z', 'asp_mrllmb7z')
+      paymentService.initialize(AGENT_ID, ASP_ID)
     }
 
     const handleWalletDisconnected = () => {
@@ -203,7 +204,7 @@ function Dashboard() {
       setIsRealWallet(true)
       setIsInitialized(true)
       executionService.setWalletAddress(result.address)
-      paymentService.initialize('agent_mrllmb7z', 'asp_mrllmb7z')
+      paymentService.initialize(AGENT_ID, ASP_ID)
       console.log('✅ Real wallet connected:', result)
     } catch (error) {
       console.error('❌ Real wallet connection failed:', error)
@@ -277,7 +278,6 @@ function Dashboard() {
     if (isProcessingPayment) return
     if (resolvedRisks.has(risk.id)) return
 
-    // Step 1: Process Payment
     setIsProcessingPayment(true)
     let paymentResult = null
     
@@ -303,7 +303,6 @@ function Dashboard() {
     
     setIsProcessingPayment(false)
 
-    // Step 2: Execute Resolution
     setIsResolving(true)
 
     try {
@@ -370,7 +369,6 @@ function Dashboard() {
       return
     }
 
-    // Process payment for all unresolved risks
     setIsProcessingPayment(true)
     let paymentResult = null
     try {
@@ -393,7 +391,6 @@ function Dashboard() {
     }
     setIsProcessingPayment(false)
 
-    // Execute all resolutions
     setIsResolving(true)
     
     try {
